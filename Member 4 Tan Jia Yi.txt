@@ -1,0 +1,139 @@
+Member 4: Tan Jia Yi
+SQL Query 1: List the details of Customer name and comments are in high tier.
+SELECT c.Name, Tier, Comments
+FROM Customer c 
+JOIN FeedBack f
+ON c.CustomerID = f.CustomerID
+JOIN LoyaltyProgram l
+ON c.CustomerID = l.CustomerID
+WHERE Tier = 'Gold';
+Operation Type: Selection
+Purpose & How User Uses It: Retrieve customer names and feedback comments for customers in a specific high loyalty tier to evaluate valuable customer feedback.
+
+SQL Query 2: List the promotion type according to the sum of rating, from highest to lower. 
+SELECT p.Type, COUNT(f.Rating) AS NumberOfRatings, 
+SUM(f.Rating) AS TotalRating
+FROM Promotion p JOIN Feedback f 
+ON p.PromoID = f.PromoID
+GROUP BY p.Type
+ORDER BY TotalRating DESC;
+Operation Type: Aggregation
+Purpose & How User Uses It: Display promotion types ranked by total feedback ratings to understand which types of promotions are most successful.
+
+Procedure 1: List the Customer Feedback base on tier input 
+CREATE OR REPLACE PROCEDURE Tier_Customer_Feedback( 
+P_tier IN VARCHAR2)
+IS 
+BEGIN 
+FOR cusF IN ( 
+SELECT c.Name, f.Comments, l.Tier 
+FROM Customer c 
+JOIN FeedBack f ON c.CustomerID = f.CustomerID 
+JOIN LoyaltyProgram l ON c.CustomerID = l.CustomerID 
+WHERE l.Tier = P_tier
+) LOOP 
+DBMS_OUTPUT.PUT_LINE('Name: ' || cusF.Name); 		DBMS_OUTPUT.PUT_LINE('Comments: ' || cusF.Comments); DBMS_OUTPUT.PUT_LINE('Tier: ' || cusF.Tier); DBMS_OUTPUT.PUT_LINE('-------------------------'); 
+END LOOP; 
+END;
+/
+
+Operation Type: Selection and Display
+Purpose & How User Uses It: List customer feedback based on loyalty tier input to analyze customer satisfaction for different tiers.
+Procedure 2: List the detail of efficient promo base on Redemption Rate. 
+
+CREATE OR REPLACE PROCEDURE Efficient_Promo 
+IS 
+BEGIN 
+FOR ePro IN ( 
+SELECT p.Title, p.Type, p.Status, a.RedemptionRate 
+FROM Promotion p 
+JOIN PromoAnalytics a ON p.PromoID = a.PromoID 
+WHERE a.RedemptionRate > 10 
+) LOOP 
+DBMS_OUTPUT.PUT_LINE('Title: ' || ePro.Title); 			DBMS_OUTPUT.PUT_LINE('Type: ' || ePro.Type); 			DBMS_OUTPUT.PUT_LINE('Status: ' || ePro.Status); 			DBMS_OUTPUT.PUT_LINE('Redemption Rate: ' || ePro.RedemptionRate || '%'); 							
+DBMS_OUTPUT.PUT_LINE('-------------------------'); 
+END LOOP; 
+END;
+/
+
+Operation Type: Selection and Display
+Purpose & How User Uses It: List promotions that show strong redemption rate for management to review effective promotional strategies.
+Function 1: Check voucher by promo tittle that are not used 
+CREATE OR REPLACE FUNCTION Check_Voucher ( 
+p_Title IN VARCHAR2 
+) 
+RETURN VARCHAR2 
+IS 
+v_output VARCHAR2(4000) := ''; 
+BEGIN 
+FOR vou IN ( 
+SELECT v.CodeID, v.DiscountValue, v.ValidFrom, v.ValidTo, v.Used 
+FROM Voucher v 
+JOIN Promotion p ON p.PromoID = v.PromoID 
+WHERE p.Title = p_Title 
+AND v.Used = 'N' 
+) LOOP 
+v_output := v_output || 
+'Code: ' || vou.CodeID || CHR(10) || 
+'Discount Value: ' || vou.DiscountValue || CHR(10) || 
+'Valid From: ' || TO_CHAR(vou.ValidFrom, 'DD-MON-YYYY') || CHR(10) || 
+'Valid To: ' || TO_CHAR(vou.ValidTo, 'DD-MON-YYYY') || CHR(10) || 
+'Used: ' || vou.Used || CHR(10) || CHR(10); 
+END LOOP;
+IF v_output IS NULL THEN 
+v_output := 'No unused vouchers found for the given title.';
+ END IF;
+RETURN v_output; 
+END; /
+Operation Type: Retrieval (Return)
+Purpose & How User Uses It: Check for vouchers that are still unused for a particular promotion, helping manage inventory of active vouchers.
+
+Function 2: List the customer name and email which are membership but loyaltyPoints is low then 200
+CREATE OR REPLACE FUNCTION Low_Point_Members 
+RETURN CLOB 
+IS
+v_result CLOB := EMPTY_CLOB(); 
+BEGIN 
+FOR low IN ( 
+SELECT c.Name, c.Email, c.LoyaltyPoints 
+FROM Customer c 
+JOIN CS_Membership cs ON c.CustomerID = cs.CustomerID
+WHERE c.LoyaltyPoints < 200 
+AND cs.Status = 'Active' 
+) LOOP 
+v_result := v_result || 'Name: ' || low.Name || CHR(10) || 
+    'Email: ' || low.Email || CHR(10) || 
+    'Loyalty Points: ' || low.LoyaltyPoints || CHR(10) || CHR(10); 
+END LOOP;
+RETURN v_result; 
+END; 
+/
+
+Operation Type: Selection and Display (Return)
+Purpose & How User Uses It: List members with loyalty points below 50 who are active members, useful for special retention campaigns.
+
+
+Command for users to use it:
+Procedure 1:
+BEGIN
+  Tier_Customer_Feedback('Gold');
+END;
+/
+
+Procedure 2:
+BEGIN
+  Efficient_Promo();
+END;
+/
+
+Function 1:
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(Check_Voucher('Spring Fling'));
+END;
+/
+
+Function 2:
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(Low_Point_Members);
+END;
+/
